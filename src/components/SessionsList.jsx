@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 function SessionsList({ isConnected, backend_url}) {
   const [sessions, setSessions] = useState([]);
@@ -9,7 +10,6 @@ function SessionsList({ isConnected, backend_url}) {
   setLoading(true);
   try {
     const res = await axios.get(`${backend_url}/sessions`);
-    console.log(res)
     // If response is an error, handle it
     if (res.status !== 200 || res.data.error) {
       console.error("Error response:", res.data);
@@ -68,30 +68,35 @@ function SessionsList({ isConnected, backend_url}) {
             <thead className="bg-gray-800 text-gray-200">
               <tr>
                 <th className="px-4 py-2 border border-gray-700">ID</th>
-                <th className="px-4 py-2 border border-gray-700">User</th>
-                <th className="px-4 py-2 border border-gray-700">Host</th>
+                <th className="px-4 py-2 border border-gray-700">User Name</th>
+                <th className="px-4 py-2 border border-gray-700">Host Name</th>
                 <th className="px-4 py-2 border border-gray-700">OS</th>
-                <th className="px-4 py-2 border border-gray-700">PID</th>
+                <th className="px-4 py-2 border border-gray-700">Transport</th>
               </tr>
             </thead>
             <tbody>
               {sessions.map((session) => (
                 <tr key={session.id} className="hover:bg-gray-800">
-                  <td className="px-4 py-2 border border-gray-700">
-                    {session.id}
-                  </td>
-                  <td className="px-4 py-2 border border-gray-700">
-                    {session.username}
-                  </td>
-                  <td className="px-4 py-2 border border-gray-700">
-                    {session.hostname}
-                  </td>
-                  <td className="px-4 py-2 border border-gray-700">
-                    {session.os}
-                  </td>
-                  <td className="px-4 py-2 border border-gray-700">
-                    {session.pid}
-                  </td>
+                    <td className="px-4 py-2 border border-gray-700">
+                    <Link
+                      key={session.id}
+                      to={`/session/${session.id}`}
+                    >
+                        {session.id}
+                    </Link>
+                    </td>
+                    <td className="px-4 py-2 border border-gray-700">
+                      {session.username}
+                    </td>
+                    <td className="px-4 py-2 border border-gray-700">
+                      {session.hostname}
+                    </td>
+                    <td className="px-4 py-2 border border-gray-700">
+                      {session.os}
+                    </td>
+                    <td className="px-4 py-2 border border-gray-700">
+                      {session.transport}
+                    </td>
                 </tr>
               ))}
             </tbody>
