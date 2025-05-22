@@ -93,9 +93,7 @@ const Navbar = ({isConnected, setIsConnected, backend_url}) => {
      !selectedOption);
 
   return (
-    <nav className={` top-0 left-0 bg-neutral-900 text-black right-0 z-50 shadow-md transition-all duration-300 ${
-      isScrolled ? 'py-2' : 'py-4'
-    }`}>
+    <nav className={`top-0 left-0 bg-neutral-900 text-black right-0 z-50 shadow-md transition-all duration-300 py-4`}>
       <div className="container mx-auto px-4 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center justify-center">

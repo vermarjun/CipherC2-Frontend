@@ -31,8 +31,8 @@ function OperatorsList({ isConnected, backend_url }) {
   }, [isConnected]);
 
   return (
-    <div className="p-6 bg-neutral-700 rounded-lg shadow-lg">
-      <div className="flex items-center justify-between mb-4">
+    <div className="px-6 bg-neutral-700 rounded-lg shadow-lg max-h-96 overflow-y-scroll">
+      <div className="sticky top-0 z-10 flex items-center justify-between mb-4 pt-6 bg-neutral-700">
         <h2 className="text-2xl font-semibold text-white">Current Operators</h2>
         <button
             onClick={fetchOperators}
