@@ -25,12 +25,14 @@ import {
   LayoutDashboardIcon,
    Monitor,
    Globe,
-   Clock
+   Clock,
+   Download,
+   Loader2,
 } from 'lucide-react';
 import axios from 'axios';
 import { backend_url } from '../App';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2 } from "lucide-react"; // optional: lucide icons
+import ScreenshotViewer from './Screenshotcapture';
 
 function Dashboard({ data, isLoading = false }) {
   const [displayData, setDisplayData] = useState(null);
@@ -176,19 +178,9 @@ function SessionDetail() {
   const { sessionId } = useParams();
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSSOpen, setIsSSOpen] = useState(false);
 
-  // Mock function to simulate navigation
   const navigate = useNavigate();
-  // Mock function to simulate API calls
-  async function interact_with_session(command) {
-    try {
-      console.log(`Command executed: ${command}`);
-      const mockResponse = { status: 'success', command, timestamp: new Date().toISOString() };
-      console.log('Response:', mockResponse);
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  }
   const management = {
       title: 'Session Management',
       icon: <Settings className="w-5 h-5" />,
@@ -204,7 +196,7 @@ function SessionDetail() {
         { name: 'Terminate', description: 'Terminate process', icon: <X className="w-5 h-5" />, command: 'terminate' },
         { name: 'Kill', description: 'Kill session', icon: <X className="w-5 h-5" />, command: 'kill', danger: true }
       ]
-    }
+  }
 
   const categories = {
     Dashboard: {
@@ -217,7 +209,7 @@ function SessionDetail() {
       icon: <Cpu className="w-5 h-5" />,
       actions: [
         { name: 'File System', description: 'Access file system', icon: <HardDrive className="w-5 h-5" />, command: 'filesystem', isLink: true, link: '/filesystem' },
-        { name: 'Screenshot', description: 'Capture screen', icon: <Camera className="w-5 h-5" />, command: 'screenshot' },
+        { name: 'Screenshot', description: 'Capture screen', icon: <Camera className="w-5 h-5" />, command: 'screenshot', function : () => setIsSSOpen(true) },
         { name: 'Shell', description: 'Interactive shell', icon: <Terminal className="w-5 h-5" />, command: 'shell' },
         { name: 'Execute', description: 'Run program', icon: <Play className="w-5 h-5" />, command: 'execute' },
         { name: 'Process List', description: 'List processes', icon: <Database className="w-5 h-5" />, command: 'ps' },
@@ -286,6 +278,7 @@ function SessionDetail() {
     }
   };
 
+  // FETCH CURRENT STATE 
   async function fetchSession(){
       const response = await axios.get(`${backend_url}/sessions/${sessionId}/files?path=/`)
       console.log("printing the session reponse")
@@ -298,8 +291,11 @@ function SessionDetail() {
   const handleActionClick = (action) => {
     if (action.isLink) {
       navigate(action.link);
+    } else if (action.function){
+      const fn = action.function;
+      fn();
     } else {
-      interact_with_session(action.command);
+      fetch_backend(action.command);
     }
   };
 
@@ -358,7 +354,7 @@ function SessionDetail() {
                     {management.actions.map((action, idx) => (
                       <button
                         key={idx}
-                        onClick={() => interact_with_session(action.command)}
+                        onClick={() => fetch_backend(action.command)}
                         className={`flex items-center w-full p-2 rounded ${action.danger ? 'hover:bg-red-600 hover:text-white' : 'hover:text-neutral-700'} hover:bg-neutral-200  ${action.danger ? 'text-red-600' : 'text-neutral-300'}`}
                       >
                         {action.icon}
@@ -471,6 +467,11 @@ function SessionDetail() {
         </div>
         }
       </div>
+      <ScreenshotViewer
+          isOpen={isSSOpen}
+          onClose={() => setIsSSOpen(false)}
+          backend_url={backend_url} // Replace with your actual backend URL
+        />
     </div>
   );
 }
