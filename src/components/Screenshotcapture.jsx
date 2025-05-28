@@ -42,7 +42,7 @@ const ScreenshotViewer = ({ isOpen, onClose, backend_url = 'http://localhost:300
 
   useEffect(() => {
     if (autoRefresh && isOpen) {
-      const interval = setInterval(fetchScreenshot, refreshInterval * 100);
+      const interval = setInterval(fetchScreenshot, refreshInterval * 1000);
       return () => clearInterval(interval);
     }
   }, [autoRefresh, isOpen]);

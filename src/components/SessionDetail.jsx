@@ -68,16 +68,16 @@ function Dashboard({ data, isLoading = false }) {
   }
 
   const getStatusColor = (status) => {
-    return status === "connected"
-      ? "text-green-400 bg-green-800/30"
-      : "text-red-400 bg-red-800/30";
+    return status
+     ?"text-red-400 bg-red-800/30"
+      : "text-green-400 bg-green-800/30";
   };
-
   const cardData = [
     {
       icon: <Globe />,
       label: "Status",
-      value: displayData.status,
+      // it returs IsDead value so if it is false means connected and if true means that the session is dead
+      value: (displayData.status)? "disconnected":"connected",
       className: `px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(displayData.status)}`,
     },
     { icon: <Monitor />, label: "Hostname", value: displayData.Hostname },

@@ -317,7 +317,7 @@ const FileExplorer = () => {
   };
 
   return (
-    <div className={`${theme.background} ${theme.text} rounded-lg shadow-lg overflow-hidden w-full max-w-6xl mx-auto h-full mb-10 flex flex-col`}>
+    <div className={`${theme.background} ${theme.text} rounded-lg shadow-lg overflow-hidden w-full max-w-6xl mx-auto h-screen  mb-10 flex flex-col`}>
 
     {/* Toolbar */}
     <ToolBarComponent explorerData={explorerData} pathHistory={pathHistory} loading={loading} theme={theme} handleBackClick={handleBackClick} setLoading={setLoading} setExplorerData={setExplorerData} setPathHistory={setPathHistory} fetch_backend={fetch_backend}/>

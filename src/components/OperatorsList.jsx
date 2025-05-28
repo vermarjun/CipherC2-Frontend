@@ -33,7 +33,7 @@ function OperatorsList({ isConnected, backend_url }) {
   return (
     <div className="px-6 bg-neutral-700 rounded-lg shadow-lg max-h-96 overflow-y-scroll">
       <div className="sticky top-0 z-10 flex items-center justify-between mb-4 pt-6 bg-neutral-700">
-        <h2 className="text-2xl font-semibold text-white">Current Operators</h2>
+        <h2 className="text-2xl font-semibold text-white">Operators</h2>
         <button
             onClick={fetchOperators}
             disabled={loading}
@@ -70,9 +70,9 @@ function OperatorsList({ isConnected, backend_url }) {
             </thead>
             <tbody>
               {operators.map((op) => (
-                <tr key={op.id} className="hover:bg-gray-800">
-                  <td className="px-4 py-2 border border-gray-700">{op.id}</td>
-                  <td className="px-4 py-2 border border-gray-700">{op.name}</td>
+                <tr key={op.id} className={`hover:bg-gray-800`}>
+                  <td className={`px-4 py-2 border border-gray-700`}>{op.id}</td>
+                  <td className={`px-4 py-2 border border-gray-700  ${op.isOnline? "text-green-500":"text-red-500"}`}>{op.name}</td>
                 </tr>
               ))}
             </tbody>

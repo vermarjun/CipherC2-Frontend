@@ -9,9 +9,9 @@ const Navbar = ({isConnected, setIsConnected, backend_url}) => {
   const [fileUploaded, setFileUploaded] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [pastConnections, setPastConnections] = useState([
-    'Server 1 (192.168.1.1)',
+    'Server 1 (192.168.24.137)',
     'Server 2 (10.0.0.2)',
-    'Production Server',
+    'Test Server',
   ]);
   const [selectedPastConnection, setSelectedPastConnection] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -93,7 +93,7 @@ const Navbar = ({isConnected, setIsConnected, backend_url}) => {
      !selectedOption);
 
   return (
-    <nav className={`top-0 left-0 bg-neutral-900 text-black right-0 z-50 shadow-md transition-all duration-300 py-4`}>
+    <nav className={`sticky top-0 left-0 bg-neutral-900 text-black right-0 z-50 shadow-md transition-all duration-300 py-4`}>
       <div className="container mx-auto px-4 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center justify-center">

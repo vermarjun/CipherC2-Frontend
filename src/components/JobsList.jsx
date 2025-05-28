@@ -2,25 +2,25 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-function SessionsList({ isConnected, backend_url}) {
-  const [sessions, setSessions] = useState([]);
+function JobsList({ isConnected, backend_url, jobs, setJobs}) {
+
   const [loading, setLoading] = useState(false);
 
-  const fetchSessions = async () => {
+  const fetchJobs = async () => {
   setLoading(true);
   try {
-    const res = await axios.get(`${backend_url}/sessions`);
+    const res = await axios.get(`${backend_url}/jobs`);
     // If response is an error, handle it
     if (res.status !== 200 || res.data.error) {
       console.error("Error response:", res.data);
-      setSessions([]);
+      setJobs([]);
       return;
     }
     console.log(res.data)
-    setSessions(res.data); // assuming it's now always a clean array
+    setJobs(res.data); // assuming it's now always a clean array
   } catch (error) {
     console.error("Fetch error:", error);
-    setSessions([]);
+    setJobs([]);
   } finally {
     setLoading(false);
   }
@@ -29,16 +29,16 @@ function SessionsList({ isConnected, backend_url}) {
 
   useEffect(() => {
     if (isConnected) {
-      fetchSessions();
+      fetchJobs();
     }
   }, [isConnected]);
 
   return (
-    <div className="p-6 bg-neutral-700 rounded-lg shadow-lg">
-      <div className="sticky top-0 flex items-center justify-between mb-4 bg-neutral-700">
-        <h2 className="text-2xl font-semibold text-white">Sessions</h2>
+    <div className="p-6 bg-neutral-700 rounded-lg shadow-lg overflow-y-scroll">
+      <div className="sticky top-0 z-10 flex items-center justify-between mb-4 bg-neutral-700">
+        <h2 className="text-2xl font-semibold text-white">Jobs</h2>
         <button
-            onClick={fetchSessions}
+            onClick={fetchJobs}
             disabled={loading}
             className={`flex items-center gap-2 px-3 py-1.5 border border-gray-600 rounded text-gray-300 transition ${
                 loading ? "cursor-not-allowed opacity-50" : "hover:bg-gray-800"
@@ -61,49 +61,37 @@ function SessionsList({ isConnected, backend_url}) {
       </div>
 
       {loading ? (
-        <div className="text-gray-300 p-4 text-center">Fetching sessions…</div>
-      ) : sessions.length > 0 ? (
-        <div className="overflow-x-auto overflow-y-scroll max-h-80">
+        <div className="text-gray-300 p-4 text-center">Fetching Jobs..</div>
+      ) : jobs.length > 0 ? (
+        <div className="overflow-x-auto">
           <table className="min-w-full border border-gray-700 text-sm text-gray-300">
             <thead className="bg-gray-800 text-gray-200">
               <tr>
                 <th className="px-4 py-2 border border-gray-700">ID</th>
-                <th className="px-4 py-2 border border-gray-700">User Name</th>
-                {/* <th className="px-4 py-2 border border-gray-700">Host Name</th> */}
-                {/* <th className="px-4 py-2 border border-gray-700">OS</th> */}
-                <th className="px-4 py-2 border border-gray-700">Transport</th>
-                <th className="px-4 py-2 border border-gray-700">First Contact</th>
-                <th className="px-4 py-2 border border-gray-700">Last Active</th>
+                <th className="px-4 py-2 border border-gray-700">Name</th>
+                <th className="px-4 py-2 border border-gray-700">Protocol</th>
+                <th className="px-4 py-2 border border-gray-700">Port</th>
               </tr>
             </thead>
             <tbody>
-              {sessions.map((session) => (
-                <tr key={session.id} className={`hover:bg-gray-800`}>
-                    <td className={`px-4 py-2 border border-gray-700 ${session.isDead?"text-red-500":"text-green-500"}`}>
+              {jobs.map((job) => (
+                <tr key={job.id} className={`hover:bg-gray-800`}>
+                    <td className={`px-4 py-2 border border-gray-700`}>
                     <Link
-                      key={session.id}
-                      to={`/session/${session.id}`}
+                      key={job.id}
+                      to={`/job/${job.id}`}
                     >
-                        {session.id.split("-").slice(-1)[0]}
+                        {job.id}
                     </Link>
                     </td>
                     <td className="px-4 py-2 border border-gray-700">
-                      {session.username}
-                    </td>
-                    {/* <td className="px-4 py-2 border border-gray-700">
-                      {session.hostname}
-                    </td> */}
-                    {/* <td className="px-4 py-2 border border-gray-700">
-                      {session.os}
-                    </td> */}
-                    <td className="px-4 py-2 border border-gray-700">
-                      {session.transport}
+                      {job.name}
                     </td>
                     <td className="px-4 py-2 border border-gray-700">
-                      {session.firstContact}
+                      {job.protocol}
                     </td>
                     <td className="px-4 py-2 border border-gray-700">
-                      {session.lastCheckIn}
+                      {job.port}
                     </td>
                 </tr>
               ))}
@@ -112,7 +100,7 @@ function SessionsList({ isConnected, backend_url}) {
         </div>
       ) : (
         <div className="text-gray-300 p-4 text-center">
-          <p>No active sessions at the moment.</p>
+          <p>No active jobs at the moment.</p>
           <p className="text-xs text-gray-400 mt-1">They’ll show up here once available.</p>
         </div>
       )}
@@ -120,4 +108,4 @@ function SessionsList({ isConnected, backend_url}) {
   );
 }
 
-export default SessionsList;
+export default JobsList;
