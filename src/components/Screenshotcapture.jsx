@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Download, X, Monitor } from 'lucide-react';
+import api from '../api';
 
-const ScreenshotViewer = ({ isOpen, onClose, backend_url = 'http://localhost:3001' }) => {
+const ScreenshotViewer = ({ isOpen, onClose }) => {
   const [screenshot, setScreenshot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -9,25 +10,22 @@ const ScreenshotViewer = ({ isOpen, onClose, backend_url = 'http://localhost:300
   const [refreshInterval, setRefreshInterval] = useState(5);
 
   const fetchScreenshot = async () => {
-    // setLoading(true);
+    setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${backend_url}/screenshot`);
+      const response = await api.get('/screenshot', {
+        responseType: 'blob'
+      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const imageUrl = URL.createObjectURL(blob);
+      const imageUrl = URL.createObjectURL(response.data);
       setScreenshot(imageUrl);
 
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.detail || err.message);
       console.error('Error fetching screenshot:', err);
     } finally {
-    //   setLoading(false);
+      setLoading(false);
     }
   };
 

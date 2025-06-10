@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { backend_url } from "../App";
-import axios from "axios";
+import api from '../api';
 
 const listeners = [
   { id: "http", label: "HTTP Listener" },
@@ -55,10 +54,12 @@ export default function ListenerPanel({ jobs }) {
   const [activeListener, setActiveListener] = useState(null);
   const [configValues, setConfigValues] = useState({});
   const [activeListeners, setActiveListeners] = useState([]);
+  const [error, setError] = useState(null);
 
   const handleListenerClick = (id) => {
     setActiveListener(id);
     setConfigValues(listenerDefaults[id]);
+    setError(null);
   };
 
   const handleConfigChange = (key, value) => {
@@ -66,32 +67,36 @@ export default function ListenerPanel({ jobs }) {
   };
 
   useEffect(() => {
-    const jobListenerNames = jobs.map((job) => job.name); // ['http', 'https', ...]
+    const jobListenerNames = jobs.map((job) => job.name);
     setActiveListeners(jobListenerNames);
   }, [jobs]);
 
   async function fetch_backend(command, configValues = {}) {
   try {
+      setError(null);
     const requestData = { command, config: configValues };
-
-    const response = await axios.post(`${backend_url}/interactwithlisteners`, requestData, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    console.log(response.data);
-    return data;
+      const response = await api.post('/interactwithlisteners', requestData);
+      console.log('Listener response:', response.data);
+      
+      if (response.data.status === 'success') {
+        setActiveListeners((prev) => [...prev, command]);
+        return response.data;
+      } else {
+        throw new Error(response.data.detail || 'Failed to start listener');
+      }
   } catch (error) {
-    console.error('Error:', error.response ? error.response.data : error.message);
+      console.error('Error starting listener:', error.response?.data || error.message);
+      setError(error.response?.data?.detail || error.message);
     return null;
   }
 }
 
-  const handleStart = () => {
+  const handleStart = async () => {
     console.log(`Starting ${activeListener.toUpperCase()} Listener with:`, configValues);
-    const res = fetch_backend(activeListener, configValues);
-    // console.log(res.data);
-    // setActiveListeners((prev) => [...prev, activeListener]);
+    const result = await fetch_backend(activeListener, configValues);
+    if (result) {
     setActiveListener(null);
+    }
   };
 
   return (
@@ -148,6 +153,12 @@ export default function ListenerPanel({ jobs }) {
                 {listeners.find((l) => l.id === activeListener)?.label} Config
               </h2>
 
+              {error && (
+                <div className="text-red-500 text-sm bg-red-900/50 p-2 rounded">
+                  {error}
+                </div>
+              )}
+
               <div className="space-y-3">
                 {Object.entries(configValues).map(([key, value]) => (
                   <div
@@ -181,7 +192,10 @@ export default function ListenerPanel({ jobs }) {
 
               <div className="flex justify-end space-x-2 pt-2">
                 <button
-                  onClick={() => setActiveListener(null)}
+                  onClick={() => {
+                    setActiveListener(null);
+                    setError(null);
+                  }}
                   className="px-3 py-1.5 text-sm rounded-md bg-neutral-700 hover:bg-neutral-600 transition"
                 >
                   Cancel

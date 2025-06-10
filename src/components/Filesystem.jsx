@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { backend_url } from '../App';
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import api from '../api';
 
 function ToolBarComponent({ explorerData, pathHistory, loading, theme, handleBackClick, setExplorerData, setPathHistory, setLoading, fetch_backend }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -81,25 +81,12 @@ function ToolBarComponent({ explorerData, pathHistory, loading, theme, handleBac
   );
 }
 
+function parseExplorerData(input) {
+  if (typeof input === 'object' && input.result) {
+    input = input.result;  // Extract the result string if it's wrapped in an object
+  }
 
-const FileExplorer = () => {
-  // Theme colors - change these to update the entire component's color scheme
-  const theme = {
-    primary: 'bg-blue-600',
-    primaryHover: 'hover:bg-blue-700',
-    primaryText: 'text-blue-600',
-    secondary: 'bg-gray-200',
-    secondaryHover: 'hover:bg-gray-300',
-    background: 'bg-white',
-    text: 'text-gray-800',
-    border: 'border-gray-300',
-    icon: 'text-blue-500',
-    selected: 'bg-blue-100',
-  };
-
-  function parseExplorerData(input) {
   const lines = input.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-
   const explorerData = {
     Path: "",
     Exists: false,
@@ -128,7 +115,8 @@ const FileExplorer = () => {
     } else if (line.startsWith('Size:')) {
       currentFile.Size = Number(line.split(':')[1].trim());
     } else if (line.startsWith('ModTime:')) {
-      currentFile.ModTime = Number(line.split(':')[1].trim());
+      // Keep ModTime as a Unix timestamp (integer)
+      currentFile.ModTime = parseInt(line.split(':')[1].trim(), 10);
     } else if (line.startsWith('Mode:')) {
       currentFile.Mode = line.match(/Mode:\s*"(.+?)"/)?.[1] || "";
       // If IsDir was never set, assume it's a file
@@ -141,51 +129,127 @@ const FileExplorer = () => {
   return explorerData;
 }
 
+const FileExplorer = () => {
+  const { sessionId } = useParams();  // Get sessionId from URL params
+  // Theme colors - change these to update the entire component's color scheme
+  const theme = {
+    primary: 'bg-blue-600',
+    primaryHover: 'hover:bg-blue-700',
+    primaryText: 'text-blue-600',
+    secondary: 'bg-gray-200',
+    secondaryHover: 'hover:bg-gray-300',
+    background: 'bg-white',
+    text: 'text-gray-800',
+    border: 'border-gray-300',
+    icon: 'text-blue-500',
+    selected: 'bg-blue-100',
+  };
+
   const [explorerData, setExplorerData] = useState({
-    path: "",
-    exists: true,
-    files: [],
+    Path: "",
+    Exists: true,
+    files: [],  // Initialize with empty array
     timezone: "IST",
     timezoneOffset: 19800
   });
 
   const [pathHistory, setPathHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  async function fetch_backend(command, path = null) {
+  const fetch_backend = async (command, path = '') => {
     try {
-        const requestData = path ? { command: command, path: path } : { command: command };
-        if (requestData.command == "cd"){
-          requestData.command = `cd, ${requestData.path}`
-        }
-        const response = await axios.post(`${backend_url}/interactwithsession`, requestData, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        console.log(response.data)
-        const data = parseExplorerData(response.data.result);
-        return data;
-    } catch (error) {
-        console.error('Error:', error.response ? error.response.data : error.message);
-        return null;
-    }
-  }
+      setError(null);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
 
-  // Initial load - get current directory
+      if (!sessionId) {
+        throw new Error('Session ID is required');
+      }
+
+      const requestData = {
+        session_id: sessionId,
+        command: command === 'cd' && path ? `cd,${path}` : command,
+        args: []
+      };
+
+      const response = await api.post('/interactwithsession', requestData);
+      
+      // Handle error responses
+      if (response.data?.status === 'error') {
+        const errorDetail = response.data.detail || '';
+        if (errorDetail.includes('AioRpcError')) {
+          if (errorDetail.includes('implant timeout')) {
+            throw new Error('Connection to implant timed out. The implant might be offline or unresponsive.');
+          } else if (errorDetail.includes('StatusCode.UNKNOWN')) {
+            throw new Error('Connection error with the implant. Please try again.');
+          }
+        }
+        throw new Error(errorDetail || 'Operation failed');
+      }
+
+      // Handle successful response
+      if (typeof response.data === 'object' && response.data.result) {
+        const parsedData = parseExplorerData(response.data.result);
+        if (!parsedData || !Array.isArray(parsedData.files)) {
+          throw new Error('Invalid response format from server');
+        }
+        return parsedData;
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error in filesystem operation:', error);
+      
+      // Set user-friendly error message
+      let errorMessage = 'An error occurred while performing the operation.';
+      if (error.response?.status === 401) {
+        errorMessage = 'Your session has expired. Please log in again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // Update state with error and safe fallback
+      setError(errorMessage);
+      setExplorerData(prev => ({
+        ...prev,
+        files: [],  // Reset files to empty array
+        Exists: false
+      }));
+
+      // Don't throw the error, just return null
+      return null;
+    }
+  };
+
+  // Update the initialization effect to handle null returns
   useEffect(() => {
     const initializeExplorer = async () => {
-      setLoading(true);
-      const data = await fetch_backend('ls');
-      if (data) {
-        setExplorerData(data);
-        setPathHistory([data.Path]);
+      if (!sessionId) {
+        setError('Session ID is required');
+        return;
       }
-      setLoading(false);
+
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetch_backend('ls');
+        if (data) {
+          setExplorerData(data);
+          setPathHistory([data.Path]);
+        }
+      } catch (error) {
+        console.error('Error initializing explorer:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     
     initializeExplorer();
-  }, []);
+  }, [sessionId]);
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [contextMenu, setContextMenu] = useState({
     visible: false,
@@ -206,32 +270,88 @@ const FileExplorer = () => {
     }
   };
 
+  const normalizeWindowsPath = (path) => {
+    // Convert all slashes to double backslashes
+    return path.replace(/[\/\\]/g, '\\\\');
+  };
+
+  const formatDate = (timestamp) => {
+    // timestamp is already in Unix format (seconds since epoch)
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+      timeZone: 'UTC'  // Use UTC to match the backend timestamps
+    });
+  };
+
+  const formatSize = (bytes) => {
+    if (!bytes) return '-';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    if (bytes === 0) return '0 Byte';
+    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+  };
+
   const handleFileDoubleClick = async (file) => {
     if (file.IsDir) {
-      setLoading(true);
-      
-      // Construct the new path
-      let newPath;
-      if (explorerData.Path.endsWith('\\')) {
-        newPath = `${explorerData.Path}${file.Name}`;
-      } else {
-        newPath = `${explorerData.Path}\\${file.Name}`;
-      }
-      
-      // Convert Windows path format to the format expected by backend
-      const backendPath = newPath.replace(/\\/g, '/');
-      // First change directory
-      const cdResult = await fetch_backend('cd', backendPath);
-      if (cdResult) {
-        // Then list contents
-        const lsResult = await fetch_backend('ls');
-        if (lsResult) {
-          setExplorerData(lsResult);
-          setPathHistory(prev => [...prev, lsResult.Path]);
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Convert all slashes to double backslashes
+        const currentPath = explorerData.Path.replace(/[\/\\]/g, '\\\\');
+        
+        // Construct the new path with double backslashes
+        const newPath = currentPath.endsWith('\\\\') 
+          ? `${currentPath}${file.Name}`
+          : `${currentPath}\\\\${file.Name}`;
+        
+        console.log('Current path:', currentPath);
+        console.log('Navigating to directory:', newPath);
+        
+        // First change directory
+        const cdResult = await fetch_backend('cd', newPath);
+        console.log('CD result:', cdResult);
+        
+        // Check if cd was successful by looking for Path in the result
+        if (cdResult && cdResult.Path) {
+          // Then list contents
+          const lsResult = await fetch_backend('ls');
+          console.log('LS result:', lsResult);
+          
+          // Even if ls returns empty, we still want to show the directory
+          const updatedLsResult = {
+            ...(lsResult || {}),
+            files: Array.isArray(lsResult?.files) ? lsResult.files.map(file => ({
+              ...file,
+              // Ensure ModTime is treated as a Unix timestamp
+              ModTime: typeof file.ModTime === 'number' ? file.ModTime : parseInt(file.ModTime, 10)
+            })) : [],
+            Path: cdResult.Path,
+            Exists: true,
+            timezone: explorerData.timezone,
+            timezoneOffset: explorerData.timezoneOffset
+          };
+          
+          setExplorerData(updatedLsResult);
+          setPathHistory(prev => [...prev, updatedLsResult.Path]);
+        } else {
+          setError('Failed to change directory');
         }
+      } catch (error) {
+        console.error('Error navigating to directory:', error);
+        if (error.response?.status !== 401) {
+          setError(error.response?.data?.detail || 'Failed to navigate to directory');
+        }
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     } else {
       // For files, show dialog
       setDialog({
@@ -242,29 +362,60 @@ const FileExplorer = () => {
   };
 
   const handleBackClick = async () => {
-    console.log("pathHistory: ",pathHistory)
     if (pathHistory.length > 1) {
-      setLoading(true);
-      
-      const newHistory = [...pathHistory];
-      newHistory.pop(); // Remove current path
-      const previousPath = newHistory[newHistory.length - 1];
-      
-      // Convert Windows path format to the format expected by backend
-      const backendPath = previousPath.replace(/\\/g, '/');
-      
-      // Change directory to previous path
-      const cdResult = await fetch_backend('cd', backendPath);
-      if (cdResult) {
-        // Then list contents
-        const lsResult = await fetch_backend('ls');
-        if (lsResult) {
-          setExplorerData(lsResult);
-          setPathHistory(newHistory);
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const newHistory = [...pathHistory];
+        newHistory.pop(); // Remove current path
+        const previousPath = newHistory[newHistory.length - 1].replace(/[\/\\]/g, '\\\\');
+        
+        console.log('Navigating back to:', previousPath);
+        
+        // Change directory to previous path
+        const cdResult = await fetch_backend('cd', previousPath);
+        console.log('CD result:', cdResult);
+        
+        // Check if cd was successful by looking for Path in the result
+        if (cdResult && cdResult.Path) {
+          // Then list contents
+          const lsResult = await fetch_backend('ls');
+          console.log('LS result:', lsResult);
+          
+          // Even if ls returns empty, we still want to show the directory
+          if (lsResult) {
+            // Ensure we have a valid files array
+            const updatedLsResult = {
+              ...lsResult,
+              files: Array.isArray(lsResult.files) ? lsResult.files : [],
+              Path: cdResult.Path, // Use the path from cd result
+              Exists: true
+            };
+            setExplorerData(updatedLsResult);
+            setPathHistory(newHistory);
+          } else {
+            // If ls fails but cd succeeded, show empty directory
+            setExplorerData({
+              Path: cdResult.Path,
+              Exists: true,
+              files: [],
+              timezone: explorerData.timezone,
+              timezoneOffset: explorerData.timezoneOffset
+            });
+            setPathHistory(newHistory);
+          }
+        } else {
+          setError('Failed to change directory');
         }
+      } catch (error) {
+        console.error('Error navigating back:', error);
+        if (error.response?.status !== 401) {
+          setError(error.response?.data?.detail || 'Failed to navigate back');
+        }
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     }
   };
 
@@ -285,39 +436,79 @@ const FileExplorer = () => {
     });
   };
 
-  const handleContextAction = (action) => {
+  const handleContextAction = async (action) => {
     switch(action) {
       case 'properties':
         setDialog({
           visible: true,
           file: contextMenu.file
         });
+        closeContextMenu();
         break;
       case 'download':
-        // Empty function for download
-        console.log(`Downloading ${contextMenu.file.Name}`);
+        try {
+          setLoading(true);
+          // Construct the full path for the file
+          const fullPath = explorerData.Path.endsWith('\\\\') 
+            ? `${explorerData.Path}${contextMenu.file.Name}`
+            : `${explorerData.Path}\\\\${contextMenu.file.Name}`;
+          
+          // Call the download endpoint and get the blob directly
+          const response = await api.post('/interactwithsession', {
+            session_id: sessionId,
+            command: `download,${fullPath}`,
+            args: []
+          }, {
+            responseType: 'blob',  // Important: tell axios to expect binary data
+            headers: {
+              'Accept': 'application/octet-stream'
+            }
+          });
+
+          // Create a blob URL and trigger download
+          const url = window.URL.createObjectURL(response.data);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = contextMenu.file.Name;  // Use the original filename
+          document.body.appendChild(a);
+          a.click();
+          
+          // Cleanup
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+          }, 100);
+        } catch (error) {
+          console.error('Error downloading file:', error);
+        } finally {
+          setLoading(false);
+          closeContextMenu();
+        }
         break;
       default:
+        closeContextMenu();
         break;
     }
-    closeContextMenu();
-  };
-
-  const formatDate = (timestamp) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString();
-  };
-
-  const formatSize = (bytes) => {
-    if (!bytes) return '-';
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    if (bytes === 0) return '0 Byte';
-    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-    return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
   };
 
   return (
-    <div className={`${theme.background} ${theme.text} rounded-lg shadow-lg overflow-hidden w-full max-w-6xl mx-auto h-screen  mb-10 flex flex-col`}>
+    <div className={`${theme.background} ${theme.text} rounded-lg shadow-lg overflow-hidden w-full max-w-6xl mx-auto h-screen mb-10 flex flex-col`}>
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">{error}</span>
+          <button 
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            onClick={() => setError(null)}
+          >
+            <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <title>Close</title>
+              <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
     {/* Toolbar */}
     <ToolBarComponent explorerData={explorerData} pathHistory={pathHistory} loading={loading} theme={theme} handleBackClick={handleBackClick} setLoading={setLoading} setExplorerData={setExplorerData} setPathHistory={setPathHistory} fetch_backend={fetch_backend}/>
@@ -346,7 +537,7 @@ const FileExplorer = () => {
           <div className="col-span-full flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : (
+        ) : explorerData.files && Array.isArray(explorerData.files) && explorerData.files.length > 0 ? (
           explorerData.files.map((file, index) => (
             <div 
               key={index}
@@ -369,6 +560,10 @@ const FileExplorer = () => {
               <span className="text-center text-sm truncate w-full">{file.Name}</span>
             </div>
           ))
+        ) : (
+          <div className="col-span-full text-center text-neutral-400 py-8">
+            No files found in this directory
+          </div>
         )}
       </div>
 

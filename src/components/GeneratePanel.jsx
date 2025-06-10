@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { backend_url } from "../App";
+import { backend_url } from "../config";
 import axios from "axios";
+import api from '../api';
 
 const options = [
   { id: "implant", label: "Generate Implant" },
@@ -25,6 +26,8 @@ export default function GeneratePanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeOption, setActiveOption] = useState(null);
   const [flagValues, setFlagValues] = useState({});
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleOptionClick = (id) => {
     setActiveOption(id);
@@ -63,10 +66,27 @@ export default function GeneratePanel() {
     }
   }
 
-  const handleGenerate = () => {
-    console.log(`Generating for ${activeOption} with flags:`, flagValues);
-    const res = fetch_backend(activeOption, flagValues);
-    setActiveOption(null);
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const res = await api.post('/interactwithGenerate', {
+        os: selectedOS,
+        arch: selectedArch,
+        format: selectedFormat,
+        // ... other form data ...
+      });
+
+      console.log('Generate response:', res.data);
+      // Handle successful response
+    } catch (error) {
+      console.error('Error generating payload:', error);
+      setError(error.response?.data?.detail || 'Failed to generate payload');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

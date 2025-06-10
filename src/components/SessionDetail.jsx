@@ -28,11 +28,15 @@ import {
    Clock,
    Download,
    Loader2,
+   Command,
+   FileCode,
+   Send,
 } from 'lucide-react';
-import axios from 'axios';
-import { backend_url } from '../App';
 import { useParams, useNavigate } from 'react-router-dom';
+import api from '../api';
 import ScreenshotViewer from './Screenshotcapture';
+import ProcessList from './ProcessList';
+import NetworkConnections from './NetworkConnections';
 
 function Dashboard({ data, isLoading = false }) {
   const [displayData, setDisplayData] = useState(null);
@@ -170,6 +174,193 @@ function Dashboard({ data, isLoading = false }) {
   );
 }
 
+function ExecuteDialog({ isOpen, onClose, sessionId }) {
+  const [mode, setMode] = useState(null);
+  const [exePath, setExePath] = useState('');
+  const [cmdInput, setCmdInput] = useState('');
+  const [output, setOutput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleExecute = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setOutput('');
+
+      let commandString;
+      if (mode === 'exe') {
+        commandString = `execute,exe,${exePath}`;
+        // Add any additional arguments if needed
+      } else {
+        commandString = `execute,command,${cmdInput}`;
+      }
+
+      console.log('Sending command:', commandString); // Add logging
+
+      const response = await api.post('/interactwithsession', {
+        command: commandString
+      });
+      
+      if (response.data.status === 'error') {
+        throw new Error(response.data.detail || 'Execution failed');
+      }
+
+      // Format the output to show stdout, stderr and exit code
+      let formattedOutput = '';
+      if (response.data.stdout) {
+        formattedOutput += `STDOUT:\n${response.data.stdout}\n\n`;
+      }
+      if (response.data.stderr) {
+        formattedOutput += `STDERR:\n${response.data.stderr}\n\n`;
+      }
+      if (response.data.exitCode !== null) {
+        formattedOutput += `Exit Code: ${response.data.exitCode}`;
+      }
+
+      setOutput(formattedOutput || 'Command executed successfully');
+    } catch (err) {
+      setError(err.message || 'Failed to execute command');
+      console.error('Execution error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-2xl mx-4 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+          <h2 className="text-xl font-semibold text-white">Execute</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-neutral-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          {!mode ? (
+            // Mode selection
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => setMode('exe')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <FileCode className="w-8 h-8 text-blue-400 mb-2 group-hover:text-blue-300" />
+                <span className="text-white font-medium">Execute File</span>
+                <span className="text-sm text-neutral-400 mt-1">Run an executable file</span>
+              </button>
+              <button
+                onClick={() => setMode('command')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <Command className="w-8 h-8 text-green-400 mb-2 group-hover:text-green-300" />
+                <span className="text-white font-medium">Run Command</span>
+                <span className="text-sm text-neutral-400 mt-1">Execute a shell command</span>
+              </button>
+            </div>
+          ) : (
+            // Input form
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-sm text-neutral-400">
+                <button
+                  onClick={() => setMode(null)}
+                  className="hover:text-white transition-colors"
+                >
+                  ← Back
+                </button>
+                <span>•</span>
+                <span>{mode === 'exe' ? 'Execute File' : 'Run Command'}</span>
+              </div>
+
+              {mode === 'exe' ? (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-300">
+                    Executable Path
+                  </label>
+                  <input
+                    type="text"
+                    value={exePath}
+                    onChange={(e) => setExePath(e.target.value)}
+                    placeholder="Enter full path to executable..."
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-300">
+                    Command
+                  </label>
+                  <input
+                    type="text"
+                    value={cmdInput}
+                    onChange={(e) => setCmdInput(e.target.value)}
+                    placeholder="Enter command to execute..."
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={handleExecute}
+                disabled={isLoading || (mode === 'exe' ? !exePath : !cmdInput)}
+                className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                  isLoading || (mode === 'exe' ? !exePath : !cmdInput)
+                    ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Executing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Execute</span>
+                  </>
+                )}
+              </button>
+
+              {error && (
+                <div className="p-3 bg-red-900/50 border border-red-800 rounded-lg text-red-200 text-sm">
+                  {error}
+                </div>
+              )}
+
+              {output && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-neutral-300">Output</h3>
+                    <button
+                      onClick={() => setOutput('')}
+                      className="text-xs text-neutral-400 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="p-3 bg-neutral-800 border border-neutral-700 rounded-lg">
+                    <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-mono">
+                      {output}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SessionDetail() {
   const [activeCategory, setActiveCategory] = useState('Dashboard');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -179,6 +370,10 @@ function SessionDetail() {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSSOpen, setIsSSOpen] = useState(false);
+  const [error, setError] = useState(null);
+  const [isExecuteOpen, setIsExecuteOpen] = useState(false);
+  const [showProcessList, setShowProcessList] = useState(false);
+  const [showNetworkConnections, setShowNetworkConnections] = useState(false);
 
   const navigate = useNavigate();
   const management = {
@@ -208,10 +403,22 @@ function SessionDetail() {
       title: 'System Control',
       icon: <Cpu className="w-5 h-5" />,
       actions: [
-        { name: 'File System', description: 'Access file system', icon: <HardDrive className="w-5 h-5" />, command: 'filesystem', isLink: true, link: '/filesystem' },
-        { name: 'Screenshot', description: 'Capture screen', icon: <Camera className="w-5 h-5" />, command: 'screenshot', function : () => setIsSSOpen(true) },
+        { 
+          name: 'File System', 
+          description: 'Access file system', 
+          icon: <HardDrive className="w-5 h-5" />, 
+          command: 'filesystem', 
+          isLink: true, 
+          link: `/filesystem/${sessionId}`
+        },
+        { name: 'Screenshot', description: 'Capture screen', icon: <Camera className="w-5 h-5" />, command: 'screenshot', function: () => setIsSSOpen(true) },
         { name: 'Shell', description: 'Interactive shell', icon: <Terminal className="w-5 h-5" />, command: 'shell' },
-        { name: 'Execute', description: 'Run program', icon: <Play className="w-5 h-5" />, command: 'execute' },
+        { 
+          name: 'Execute', 
+          description: 'Run program or command', 
+          icon: <Play className="w-5 h-5" />, 
+          function: () => setIsExecuteOpen(true) 
+        },
         { name: 'Process List', description: 'List processes', icon: <Database className="w-5 h-5" />, command: 'ps' },
         { name: 'Network Info', description: 'Interface config', icon: <Network className="w-5 h-5" />, command: 'ifconfig' },
         { name: 'Netstat', description: 'Network connections', icon: <Wifi className="w-5 h-5" />, command: 'netstat' },
@@ -278,22 +485,40 @@ function SessionDetail() {
     }
   };
 
-  // FETCH CURRENT STATE 
-  async function fetchSession(){
-      const response = await axios.get(`${backend_url}/sessions/${sessionId}/files?path=/`)
-      console.log("printing the session reponse")
-      console.log(response);
-      console.log("printing the session reponse data")
-      console.log(response.data)
+  async function fetchSession() {
+    try {
+      setError(null);
+      setIsLoading(true);
+      const response = await api.get(`/sessions/${sessionId}/files?path=/`);
+      console.log('Session data:', response.data);
       setData(response.data);
-  } 
+    } catch (error) {
+      console.error('Error fetching session:', error.response?.data || error.message);
+      setError(error.response?.data?.detail || 'Failed to fetch session data');
+      if (error.response?.status === 401) {
+        // Token expired or invalid
+        navigate('/login');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchSession();
+  }, [sessionId]);
 
   const handleActionClick = (action) => {
     if (action.isLink) {
+      console.log('Navigating to:', action.link);
       navigate(action.link);
-    } else if (action.function){
+    } else if (action.function) {
       const fn = action.function;
       fn();
+    } else if (action.command === 'ps') {
+      setShowProcessList(true);
+    } else if (action.command === 'netstat') {
+      setShowNetworkConnections(true);
     } else {
       fetch_backend(action.command);
     }
@@ -302,9 +527,6 @@ function SessionDetail() {
   const toggleDialog = () => setIsDialogOpen(!isDialogOpen);
 
   useEffect(()=>{ 
-    setIsLoading(true); 
-    fetchSession();
-    setIsLoading(false); 
     const handleClickOutside = (event) => {
       if (dialogRef.current && !dialogRef.current.contains(event.target) && !buttonRef.current.contains(event.target)) {
         setIsDialogOpen(false);
@@ -336,8 +558,8 @@ function SessionDetail() {
             </div>
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-800 rounded-lg">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-gray-300">Active</span>
+                <div className={`w-2 h-2 ${data == null || !data.isDead? "bg-green-500":"bg-red-500"} rounded-full animate-pulse`}></div>
+                <span className="text-sm text-gray-300">{(data == null || !data.isDead)?"Active":"Dead"}</span>
               </div>
               <div className='relative'>
                 <button ref={buttonRef} onClick={toggleDialog} className="p-2 hover:bg-neutral-800 rounded-lg transition-colors">
@@ -426,52 +648,70 @@ function SessionDetail() {
           </p>
         </div>
 
-        {/* Action Grid */}
-        {
-          (categories[activeCategory].title == 'Dashboard') ? 
-          <Dashboard data={data} isLoading={isLoading}/> 
-            : 
+        {/* Action Grid, Process List, or Network Connections */}
+        {showProcessList ? (
+          <ProcessList 
+            sessionId={sessionId} 
+            onBack={() => setShowProcessList(false)} 
+          />
+        ) : showNetworkConnections ? (
+          <NetworkConnections
+            sessionId={sessionId}
+            onBack={() => setShowNetworkConnections(false)}
+          />
+        ) : categories[activeCategory].title === 'Dashboard' ? (
+          <Dashboard data={data} isLoading={isLoading} />
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {categories[activeCategory].actions.map((action, index) => (
-            <div
-              key={index}
-              onClick={() => handleActionClick(action)}
-              className={`group relative bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 rounded-xl p-5 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-neutral-950/50 ${
-                action.danger ? 'hover:border-red-500/50 hover:bg-red-950/20' : ''
-              }`}
-            >
-              <div className="flex items-start space-x-4">
-                <div className={`p-3 rounded-lg ${
-                  action.danger 
-                    ? 'bg-red-950/50 text-red-400 group-hover:bg-red-900/50' 
-                    : 'bg-neutral-800 text-gray-400 group-hover:bg-neutral-700 group-hover:text-gray-300'
-                } transition-colors duration-200`}>
-                  {action.icon}
+            {categories[activeCategory].actions.map((action, index) => (
+              <div
+                key={index}
+                onClick={() => handleActionClick(action)}
+                className={`group relative bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 rounded-xl p-5 cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-neutral-950/50 ${
+                  action.danger ? 'hover:border-red-500/50 hover:bg-red-950/20' : ''
+                }`}
+              >
+                <div className="flex items-start space-x-4">
+                  <div className={`p-3 rounded-lg ${
+                    action.danger 
+                      ? 'bg-red-950/50 text-red-400 group-hover:bg-red-900/50' 
+                      : 'bg-neutral-800 text-gray-400 group-hover:bg-neutral-700 group-hover:text-gray-300'
+                  } transition-colors duration-200`}>
+                    {action.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`font-semibold text-gray-100 group-hover:text-white transition-colors ${
+                      action.danger ? 'group-hover:text-red-400' : ''
+                    }`}>
+                      {action.name}
+                    </h3>
+                    <p className="text-sm text-gray-400 mt-1 group-hover:text-gray-300 transition-colors">
+                      {action.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className={`font-semibold text-gray-100 group-hover:text-white transition-colors ${
-                    action.danger ? 'group-hover:text-red-400' : ''
-                  }`}>
-                    {action.name}
-                  </h3>
-                  <p className="text-sm text-gray-400 mt-1 group-hover:text-gray-300 transition-colors">
-                    {action.description}
-                  </p>
-                </div>
+                
+                {/* Hover effect indicator */}
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
               </div>
-              
-              {/* Hover effect indicator */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-            </div>
-          ))}
-        </div>
-        }
+            ))}
+          </div>
+        )}
       </div>
       <ScreenshotViewer
           isOpen={isSSOpen}
           onClose={() => setIsSSOpen(false)}
-          backend_url={backend_url} // Replace with your actual backend URL
         />
+      <ExecuteDialog
+        isOpen={isExecuteOpen}
+        onClose={() => setIsExecuteOpen(false)}
+        sessionId={sessionId}
+      />
+      {error && (
+        <div className="fixed top-4 right-4 bg-red-900/90 text-red-100 px-4 py-2 rounded-lg shadow-lg z-50">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

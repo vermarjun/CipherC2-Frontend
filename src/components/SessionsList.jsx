@@ -1,119 +1,124 @@
-import axios from "axios";
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useDashboard } from '../context/DashboardContext';
+import { useState } from 'react';
 
-function SessionsList({ isConnected, backend_url}) {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchSessions = async () => {
-  setLoading(true);
+// Helper function to format date
+const formatDate = (timestamp) => {
   try {
-    const res = await axios.get(`${backend_url}/sessions`);
-    // If response is an error, handle it
-    if (res.status !== 200 || res.data.error) {
-      console.error("Error response:", res.data);
-      setSessions([]);
-      return;
+    // Convert Unix timestamp (seconds) to milliseconds for JavaScript Date
+    const date = new Date(timestamp * 1000);
+    if (isNaN(date.getTime())) {
+      console.error('Invalid timestamp:', timestamp);
+      return 'Invalid Date';
     }
-    console.log(res.data)
-    setSessions(res.data); // assuming it's now always a clean array
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,  // Use 12-hour format with AM/PM
+      // Remove timeZone: 'UTC' to use local timezone
+    });
   } catch (error) {
-    console.error("Fetch error:", error);
-    setSessions([]);
-  } finally {
-    setLoading(false);
+    console.error('Error formatting date:', error);
+    return 'Invalid Date';
   }
 };
 
+// Helper function to format session ID
+const formatSessionId = (sessionId) => {
+  // Get the part before the first dash
+  const parts = sessionId.split('-');
+  return parts[0];
+};
 
-  useEffect(() => {
-    if (isConnected) {
-      fetchSessions();
-    }
-  }, [isConnected]);
+function SessionsList() {
+  const { sessions, isLoading } = useDashboard();
+  const [showActive, setShowActive] = useState(true);
+
+  // Filter sessions based on active/dead status
+  const filteredSessions = sessions.filter(session => showActive ? !session.isDead : session.isDead);
 
   return (
-    <div className="p-6 bg-neutral-700 rounded-lg shadow-lg">
-      <div className="sticky top-0 flex items-center justify-between mb-4 bg-neutral-700">
-        <h2 className="text-2xl font-semibold text-white">Sessions</h2>
-        <button
-            onClick={fetchSessions}
-            disabled={loading}
-            className={`flex items-center gap-2 px-3 py-1.5 border border-gray-600 rounded text-gray-300 transition ${
-                loading ? "cursor-not-allowed opacity-50" : "hover:bg-gray-800"
+    <div className="w-full">
+      {/* Toggle buttons */}
+      <div className="flex items-center space-x-4 mb-4">
+        <h2 className="text-xl font-semibold text-white">
+          {showActive ? 'Active Sessions' : 'Dead Sessions'}
+        </h2>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setShowActive(true)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              showActive 
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-300'
             }`}
-            >
-            {loading ? (
-                <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Fetching
-                </>
-            ) : (
-                <>
-                Refresh
-                </>
-            )}
-            </button>
+          >
+            Active Sessions
+          </button>
+          <button
+            onClick={() => setShowActive(false)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              !showActive 
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-300'
+            }`}
+          >
+            Dead Sessions
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="text-gray-300 p-4 text-center">Fetching sessions…</div>
-      ) : sessions.length > 0 ? (
-        <div className="overflow-x-auto overflow-y-scroll max-h-80">
-          <table className="min-w-full border border-gray-700 text-sm text-gray-300">
-            <thead className="bg-gray-800 text-gray-200">
+      {isLoading.sessions ? (
+        <div className="text-neutral-400 p-4 text-center">Fetching sessions…</div>
+      ) : filteredSessions.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border border-neutral-800 text-sm text-neutral-300">
+            <thead className="bg-neutral-800 text-neutral-200">
               <tr>
-                <th className="px-4 py-2 border border-gray-700">ID</th>
-                <th className="px-4 py-2 border border-gray-700">User Name</th>
-                {/* <th className="px-4 py-2 border border-gray-700">Host Name</th> */}
-                {/* <th className="px-4 py-2 border border-gray-700">OS</th> */}
-                <th className="px-4 py-2 border border-gray-700">Transport</th>
-                <th className="px-4 py-2 border border-gray-700">First Contact</th>
-                <th className="px-4 py-2 border border-gray-700">Last Active</th>
+                <th className="px-4 py-2 border border-neutral-800">ID</th>
+                <th className="px-4 py-2 border border-neutral-800">User Name</th>
+                <th className="px-4 py-2 border border-neutral-800">Transport</th>
+                <th className="px-4 py-2 border border-neutral-800">First Contact</th>
+                <th className="px-4 py-2 border border-neutral-800">Last Active</th>
               </tr>
             </thead>
             <tbody>
-              {sessions.map((session) => (
-                <tr key={session.id} className={`hover:bg-gray-800`}>
-                    <td className={`px-4 py-2 border border-gray-700 ${session.isDead?"text-red-500":"text-green-500"}`}>
-                    <Link
-                      key={session.id}
-                      to={`/session/${session.id}`}
-                    >
-                        {session.id.split("-").slice(-1)[0]}
+              {filteredSessions.map((session) => (
+                <tr key={session.id} className="hover:bg-neutral-800">
+                  <td className={`px-4 py-2 border border-neutral-800 ${session.isDead ? "text-red-500" : "text-emerald-500"}`}>
+                    <Link to={`/session/${session.id}`} className="hover:text-blue-400">
+                      {formatSessionId(session.id)}
                     </Link>
-                    </td>
-                    <td className="px-4 py-2 border border-gray-700">
-                      {session.username}
-                    </td>
-                    {/* <td className="px-4 py-2 border border-gray-700">
-                      {session.hostname}
-                    </td> */}
-                    {/* <td className="px-4 py-2 border border-gray-700">
-                      {session.os}
-                    </td> */}
-                    <td className="px-4 py-2 border border-gray-700">
-                      {session.transport}
-                    </td>
-                    <td className="px-4 py-2 border border-gray-700">
-                      {session.firstContact}
-                    </td>
-                    <td className="px-4 py-2 border border-gray-700">
-                      {session.lastCheckIn}
-                    </td>
+                  </td>
+                  <td className="px-4 py-2 border border-neutral-800 text-neutral-300">
+                    {session.username}
+                  </td>
+                  <td className="px-4 py-2 border border-neutral-800 text-neutral-300">
+                    {session.transport}
+                  </td>
+                  <td className="px-4 py-2 border border-neutral-800 text-neutral-300">
+                    {formatDate(session.firstContact)}
+                  </td>
+                  <td className="px-4 py-2 border border-neutral-800 text-neutral-300">
+                    {formatDate(session.lastCheckIn)}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : (
-        <div className="text-gray-300 p-4 text-center">
-          <p>No active sessions at the moment.</p>
-          <p className="text-xs text-gray-400 mt-1">They’ll show up here once available.</p>
+        <div className="text-neutral-300 p-4 text-center">
+          <p>No {showActive ? 'active' : 'dead'} sessions at the moment.</p>
+          <p className="text-xs text-neutral-400 mt-1">
+            {showActive 
+              ? "They'll show up here once available."
+              : "No terminated sessions to display."}
+          </p>
         </div>
       )}
     </div>
