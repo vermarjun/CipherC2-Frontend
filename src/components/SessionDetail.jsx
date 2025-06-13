@@ -31,6 +31,7 @@ import {
    Command,
    FileCode,
    Send,
+   Search,
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
@@ -361,6 +362,744 @@ function ExecuteDialog({ isOpen, onClose, sessionId }) {
   );
 }
 
+function EnvironmentDialog({ isOpen, onClose, sessionId }) {
+  const [mode, setMode] = useState(null); // 'get', 'set', or 'unset'
+  const [getVarName, setGetVarName] = useState('');
+  const [newVarName, setNewVarName] = useState('');
+  const [newVarValue, setNewVarValue] = useState('');
+  const [unsetVarName, setUnsetVarName] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [output, setOutput] = useState('');
+
+  const fetchEnvVar = async (name) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.get(`/environment?session_id=${sessionId}&name=${encodeURIComponent(name)}`);
+      if (response.data.status === 'success') {
+        const envVar = response.data.environment[0];
+        setOutput(`${envVar.name}=${envVar.value}`);
+      } else {
+        throw new Error('Failed to fetch environment variable');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching environment variable:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetEnv = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.post(`/environment?session_id=${sessionId}&name=${encodeURIComponent(newVarName)}&value=${encodeURIComponent(newVarValue)}`);
+      if (response.data.status === 'success') {
+        setNewVarName('');
+        setNewVarValue('');
+        setOutput(response.data.message);
+      } else {
+        throw new Error('Failed to set environment variable');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error setting environment variable:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnsetEnv = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.delete(`/environment?session_id=${sessionId}&name=${encodeURIComponent(unsetVarName)}`);
+      if (response.data.status === 'success') {
+        setUnsetVarName('');
+        setOutput(response.data.message);
+      } else {
+        throw new Error('Failed to unset environment variable');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error unsetting environment variable:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetState = () => {
+    setMode(null);
+    setGetVarName('');
+    setNewVarName('');
+    setNewVarValue('');
+    setUnsetVarName('');
+    setError(null);
+    setOutput('');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-2xl mx-4 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+          <h2 className="text-xl font-semibold text-white">Environment Variables</h2>
+          <button
+            onClick={() => {
+              resetState();
+              onClose();
+            }}
+            className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-neutral-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          {!mode ? (
+            // Mode selection
+            <div className="grid grid-cols-3 gap-4">
+              <button
+                onClick={() => setMode('get')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <Eye className="w-8 h-8 text-blue-400 mb-2 group-hover:text-blue-300" />
+                <span className="text-white font-medium">Get Variable</span>
+                <span className="text-sm text-neutral-400 mt-1">Get a specific variable</span>
+              </button>
+              <button
+                onClick={() => setMode('set')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <Edit className="w-8 h-8 text-green-400 mb-2 group-hover:text-green-300" />
+                <span className="text-white font-medium">Set Variable</span>
+                <span className="text-sm text-neutral-400 mt-1">Set a new variable</span>
+              </button>
+              <button
+                onClick={() => setMode('unset')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <X className="w-8 h-8 text-red-400 mb-2 group-hover:text-red-300" />
+                <span className="text-white font-medium">Unset Variable</span>
+                <span className="text-sm text-neutral-400 mt-1">Remove a variable</span>
+              </button>
+            </div>
+          ) : (
+            // Input form
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-sm text-neutral-400">
+                <button
+                  onClick={resetState}
+                  className="hover:text-white transition-colors"
+                >
+                  ← Back
+                </button>
+                <span>•</span>
+                <span>
+                  {mode === 'get' ? 'Get Variable' : 
+                   mode === 'set' ? 'Set Variable' : 
+                   'Unset Variable'}
+                </span>
+              </div>
+
+              {mode === 'get' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-neutral-300">
+                      Variable Name
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={getVarName}
+                        onChange={(e) => setGetVarName(e.target.value)}
+                        placeholder="Enter variable name..."
+                        className="flex-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                      />
+                      <button
+                        onClick={() => fetchEnvVar(getVarName)}
+                        disabled={isLoading || !getVarName}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                          isLoading || !getVarName
+                            ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                      >
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Fetching...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Search className="w-4 h-4" />
+                            <span>Fetch</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === 'set' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-neutral-300">
+                      Variable Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newVarName}
+                      onChange={(e) => setNewVarName(e.target.value)}
+                      placeholder="Enter variable name..."
+                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-neutral-300">
+                      Variable Value
+                    </label>
+                    <input
+                      type="text"
+                      value={newVarValue}
+                      onChange={(e) => setNewVarValue(e.target.value)}
+                      placeholder="Enter variable value..."
+                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSetEnv}
+                    disabled={isLoading || !newVarName || !newVarValue}
+                    className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                      isLoading || !newVarName || !newVarValue
+                        ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 text-white'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Setting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Set Variable</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {mode === 'unset' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-neutral-300">
+                      Variable Name
+                    </label>
+                    <input
+                      type="text"
+                      value={unsetVarName}
+                      onChange={(e) => setUnsetVarName(e.target.value)}
+                      placeholder="Enter variable name to unset..."
+                      className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleUnsetEnv}
+                    disabled={isLoading || !unsetVarName}
+                    className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                      isLoading || !unsetVarName
+                        ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Unsetting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Unset Variable</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {error && (
+                <div className="p-3 bg-red-900/50 border border-red-800 rounded-lg text-red-200 text-sm">
+                  {error}
+                </div>
+              )}
+
+              {output && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-neutral-300">Output</h3>
+                    <button
+                      onClick={() => setOutput('')}
+                      className="text-xs text-neutral-400 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="p-3 bg-neutral-800 border border-neutral-700 rounded-lg">
+                    <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-mono">
+                      {output}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RegistryDialog({ isOpen, onClose, sessionId }) {
+  const [mode, setMode] = useState(null); // 'read', 'write', or 'create'
+  const [hive, setHive] = useState('HKLM');
+  const [regPath, setRegPath] = useState('');
+  const [key, setKey] = useState('');
+  const [regType, setRegType] = useState('STRING');
+  const [stringValue, setStringValue] = useState('');
+  const [dwordValue, setDwordValue] = useState('');
+  const [qwordValue, setQwordValue] = useState('');
+  const [byteValue, setByteValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [output, setOutput] = useState('');
+
+  const hiveOptions = [
+    'HKLM',
+    'HKCU',
+    'HKCR',
+    'HKU',
+    'HKCC'
+  ];
+
+  const regTypeOptions = [
+    { value: 'STRING', label: 'String Value' },
+    { value: 'DWORD', label: 'DWORD Value' },
+    { value: 'QWORD', label: 'QWORD Value' },
+    { value: 'BINARY', label: 'Binary Value' }
+  ];
+
+  const handleReadRegistry = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.get(`/registry?session_id=${sessionId}&hive=${encodeURIComponent(hive)}&reg_path=${encodeURIComponent(regPath)}&key=${encodeURIComponent(key)}`);
+      if (response.data.status === 'success') {
+        const regData = response.data.registry;
+        if (regData && regData.value) {
+          const value = regData.value;
+          let displayValue = '';
+          
+          switch (value.type) {
+            case 'STRING':
+              displayValue = value.string_value;
+              break;
+            case 'DWORD':
+              displayValue = value.dword_value;
+              break;
+            case 'QWORD':
+              displayValue = value.qword_value;
+              break;
+            case 'BINARY':
+              displayValue = value.byte_value;
+              break;
+            default:
+              displayValue = 'Unknown type';
+          }
+          
+          setOutput(`Type: ${value.type}\nValue: ${displayValue}`);
+        } else {
+          setOutput('No value found');
+        }
+      } else {
+        throw new Error('Failed to read registry value');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error reading registry value:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleWriteRegistry = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Validate inputs based on type
+      if (regType === 'STRING' && !stringValue) {
+        throw new Error('String value required for STRING type');
+      } else if (regType === 'DWORD' && !dwordValue) {
+        throw new Error('DWORD value required for DWORD type');
+      } else if (regType === 'QWORD' && !qwordValue) {
+        throw new Error('QWORD value required for QWORD type');
+      } else if (regType === 'BINARY' && !byteValue) {
+        throw new Error('Binary value required for BINARY type');
+      }
+
+      const params = new URLSearchParams({
+        session_id: sessionId,
+        hive: hive,
+        reg_path: regPath,
+        key: key,
+        reg_type: regType
+      });
+
+      // Add value based on type
+      if (regType === 'STRING') params.append('string_value', stringValue);
+      if (regType === 'DWORD') params.append('dword_value', dwordValue);
+      if (regType === 'QWORD') params.append('qword_value', qwordValue);
+      if (regType === 'BINARY') params.append('byte_value', byteValue);
+
+      const response = await api.post(`/registry?${params.toString()}`);
+      if (response.data.status === 'success') {
+        setOutput(response.data.message);
+        // Clear values after successful write
+        setStringValue('');
+        setDwordValue('');
+        setQwordValue('');
+        setByteValue('');
+      } else {
+        throw new Error('Failed to write registry value');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error writing registry value:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateKey = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.post(`/registry/create-key?session_id=${sessionId}&hive=${encodeURIComponent(hive)}&reg_path=${encodeURIComponent(regPath)}&key=${encodeURIComponent(key)}`);
+      if (response.data.status === 'success') {
+        setOutput(response.data.message);
+        // Clear values after successful creation
+        setRegPath('');
+        setKey('');
+      } else {
+        throw new Error('Failed to create registry key');
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error('Error creating registry key:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetState = () => {
+    setMode(null);
+    setHive('HKEY_LOCAL_MACHINE');
+    setRegPath('');
+    setKey('');
+    setRegType('STRING');
+    setStringValue('');
+    setDwordValue('');
+    setQwordValue('');
+    setByteValue('');
+    setError(null);
+    setOutput('');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-2xl mx-4 shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-neutral-800">
+          <h2 className="text-xl font-semibold text-white">Registry Operations</h2>
+          <button
+            onClick={() => {
+              resetState();
+              onClose();
+            }}
+            className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-neutral-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          {!mode ? (
+            // Mode selection
+            <div className="grid grid-cols-3 gap-4">
+              <button
+                onClick={() => setMode('read')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <Eye className="w-8 h-8 text-blue-400 mb-2 group-hover:text-blue-300" />
+                <span className="text-white font-medium">Read Value</span>
+                <span className="text-sm text-neutral-400 mt-1">Read a registry value</span>
+              </button>
+              <button
+                onClick={() => setMode('write')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <Edit className="w-8 h-8 text-green-400 mb-2 group-hover:text-green-300" />
+                <span className="text-white font-medium">Write Value</span>
+                <span className="text-sm text-neutral-400 mt-1">Set a registry value</span>
+              </button>
+              <button
+                onClick={() => setMode('create')}
+                className="flex flex-col items-center p-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-all group"
+              >
+                <Database className="w-8 h-8 text-purple-400 mb-2 group-hover:text-purple-300" />
+                <span className="text-white font-medium">Create Key</span>
+                <span className="text-sm text-neutral-400 mt-1">Create a new key</span>
+              </button>
+            </div>
+          ) : (
+            // Input form
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 text-sm text-neutral-400">
+                <button
+                  onClick={resetState}
+                  className="hover:text-white transition-colors"
+                >
+                  ← Back
+                </button>
+                <span>•</span>
+                <span>
+                  {mode === 'read' ? 'Read Registry Value' : 
+                   mode === 'write' ? 'Write Registry Value' : 
+                   'Create Registry Key'}
+                </span>
+              </div>
+
+              {/* Common fields for all modes */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-300">
+                    Registry Hive
+                  </label>
+                  <select
+                    value={hive}
+                    onChange={(e) => setHive(e.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  >
+                    {hiveOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-300">
+                    Registry Path
+                  </label>
+                  <input
+                    type="text"
+                    value={regPath}
+                    onChange={(e) => setRegPath(e.target.value)}
+                    placeholder="Enter registry path (e.g., SOFTWARE\\MyApp)"
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-neutral-300">
+                    Key Name
+                  </label>
+                  <input
+                    type="text"
+                    value={key}
+                    onChange={(e) => setKey(e.target.value)}
+                    placeholder="Enter key name"
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Additional fields for write mode */}
+                {mode === 'write' && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-neutral-300">
+                        Value Type
+                      </label>
+                      <select
+                        value={regType}
+                        onChange={(e) => setRegType(e.target.value)}
+                        className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      >
+                        {regTypeOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {regType === 'STRING' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-neutral-300">
+                          String Value
+                        </label>
+                        <input
+                          type="text"
+                          value={stringValue}
+                          onChange={(e) => setStringValue(e.target.value)}
+                          placeholder="Enter string value"
+                          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    {regType === 'DWORD' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-neutral-300">
+                          DWORD Value
+                        </label>
+                        <input
+                          type="number"
+                          value={dwordValue}
+                          onChange={(e) => setDwordValue(e.target.value)}
+                          placeholder="Enter DWORD value (0-4294967295)"
+                          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    {regType === 'QWORD' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-neutral-300">
+                          QWORD Value
+                        </label>
+                        <input
+                          type="number"
+                          value={qwordValue}
+                          onChange={(e) => setQwordValue(e.target.value)}
+                          placeholder="Enter QWORD value"
+                          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    {regType === 'BINARY' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-neutral-300">
+                          Binary Value (hex)
+                        </label>
+                        <input
+                          type="text"
+                          value={byteValue}
+                          onChange={(e) => setByteValue(e.target.value)}
+                          placeholder="Enter binary value as hex (e.g., 00 FF A1)"
+                          className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Action button */}
+                <button
+                  onClick={
+                    mode === 'read' ? handleReadRegistry :
+                    mode === 'write' ? handleWriteRegistry :
+                    handleCreateKey
+                  }
+                  disabled={isLoading || !hive || !regPath || !key || 
+                    (mode === 'write' && (
+                      (regType === 'STRING' && !stringValue) ||
+                      (regType === 'DWORD' && !dwordValue) ||
+                      (regType === 'QWORD' && !qwordValue) ||
+                      (regType === 'BINARY' && !byteValue)
+                    ))
+                  }
+                  className={`w-full flex items-center justify-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                    isLoading || !hive || !regPath || !key || 
+                    (mode === 'write' && (
+                      (regType === 'STRING' && !stringValue) ||
+                      (regType === 'DWORD' && !dwordValue) ||
+                      (regType === 'QWORD' && !qwordValue) ||
+                      (regType === 'BINARY' && !byteValue)
+                    ))
+                      ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                      : mode === 'read' ? 'bg-blue-600 hover:bg-blue-700 text-white' :
+                        mode === 'write' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                        'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>
+                        {mode === 'read' ? 'Reading...' :
+                         mode === 'write' ? 'Writing...' :
+                         'Creating...'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>
+                        {mode === 'read' ? 'Read Value' :
+                         mode === 'write' ? 'Write Value' :
+                         'Create Key'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-900/50 border border-red-800 rounded-lg text-red-200 text-sm">
+                  {error}
+                </div>
+              )}
+
+              {output && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-neutral-300">Output</h3>
+                    <button
+                      onClick={() => setOutput('')}
+                      className="text-xs text-neutral-400 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="p-3 bg-neutral-800 border border-neutral-700 rounded-lg">
+                    <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-mono">
+                      {output}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SessionDetail() {
   const [activeCategory, setActiveCategory] = useState('Dashboard');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -374,6 +1113,7 @@ function SessionDetail() {
   const [isExecuteOpen, setIsExecuteOpen] = useState(false);
   const [showProcessList, setShowProcessList] = useState(false);
   const [showNetworkConnections, setShowNetworkConnections] = useState(false);
+  const [activeDialog, setActiveDialog] = useState(null);
 
   const navigate = useNavigate();
   const management = {
@@ -422,7 +1162,21 @@ function SessionDetail() {
         { name: 'Process List', description: 'List processes', icon: <Database className="w-5 h-5" />, command: 'ps' },
         { name: 'Network Info', description: 'Interface config', icon: <Network className="w-5 h-5" />, command: 'ifconfig' },
         { name: 'Netstat', description: 'Network connections', icon: <Wifi className="w-5 h-5" />, command: 'netstat' },
-        { name: 'Session Info', description: 'Session details', icon: <Eye className="w-5 h-5" />, command: 'info' }
+        { name: 'Session Info', description: 'Session details', icon: <Eye className="w-5 h-5" />, command: 'info' },
+        { 
+          name: 'Environment Variables', 
+          description: 'Manage environment variables', 
+          icon: <Settings className="w-5 h-5" />, 
+          command: 'environment', 
+          function: () => setActiveDialog('environment') 
+        },
+        { 
+          name: 'Registry Operations', 
+          description: 'Manage registry keys and values', 
+          icon: <Database className="w-5 h-5" />, 
+          command: 'registry', 
+          function: () => setActiveDialog('registry') 
+        },
       ]
     },
     privileges: {
@@ -707,6 +1461,20 @@ function SessionDetail() {
         onClose={() => setIsExecuteOpen(false)}
         sessionId={sessionId}
       />
+      {activeDialog === 'environment' && (
+        <EnvironmentDialog
+          isOpen={true}
+          onClose={() => setActiveDialog(null)}
+          sessionId={sessionId}
+        />
+      )}
+      {activeDialog === 'registry' && (
+        <RegistryDialog
+          isOpen={true}
+          onClose={() => setActiveDialog(null)}
+          sessionId={sessionId}
+        />
+      )}
       {error && (
         <div className="fixed top-4 right-4 bg-red-900/90 text-red-100 px-4 py-2 rounded-lg shadow-lg z-50">
           {error}

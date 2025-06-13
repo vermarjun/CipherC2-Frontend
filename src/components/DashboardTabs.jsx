@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Terminal, Users, Settings } from 'lucide-react';
+import { Terminal, Users, Settings, Shield } from 'lucide-react';
 
 export default function DashboardTabs() {
   const tabs = [
@@ -17,6 +17,11 @@ export default function DashboardTabs() {
       name: 'Operations',
       href: '/dashboard/operations',
       icon: Settings,
+    },
+    {
+      name: 'Access',
+      href: '/dashboard/access',
+      icon: Shield,
     },
   ];
 

@@ -266,7 +266,7 @@ const Navbar = ({ backend_url }) => {
         </div>
 
         {/* Navigation Links */}
-        <div className="flex items-center space-x-6">
+        {/* <div className="flex items-center space-x-6">
           <Link 
             to="/dashboard/sessions" 
             className="text-neutral-300 hover:text-white transition-colors"
@@ -290,8 +290,8 @@ const Navbar = ({ backend_url }) => {
             className="text-neutral-300 hover:text-white transition-colors"
           >
             Activity
-          </Link>
-        </div>
+          </Link> */}
+        {/* </div> */}
 
         {/* User and Connect Section */}
         <div className="flex items-center space-x-4">

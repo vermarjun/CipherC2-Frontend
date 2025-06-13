@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import SessionsTab from './pages/dashboard/SessionsTab';
 import OperatorsTab from './pages/dashboard/OperatorsTab';
 import OperationsTab from './pages/dashboard/OperationsTab';
+import AccessTab from './pages/dashboard/AccessTab';
 import ClientDetail from './pages/dashboard/ClientDetail';
 import SessionDetail from './components/SessionDetail';
 import FileExplorer from './components/Filesystem';
@@ -32,14 +33,12 @@ function App() {
               <Route path="/dashboard/sessions" element={<SessionsTab />} />
               <Route path="/dashboard/operators" element={<OperatorsTab />} />
               <Route path="/dashboard/operations" element={<OperationsTab />} />
+              <Route path="/dashboard/access" element={<AccessTab />} />
               <Route path="/dashboard/activity" element={<UserActivityDashboard />} />
               <Route path="/dashboard/client/:clientId" element={<ClientDetail />} />
               <Route path="/session/:sessionId" element={<SessionDetail />} />
               <Route path="/filesystem/:sessionId" element={<FileExplorer />} />
             </Route>
-
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </UserActivityProvider>
       </DashboardProvider>
