@@ -3,11 +3,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SessionsTab from './pages/dashboard/SessionsTab';
+import VictimsTab from './pages/dashboard/VictimsTab';
 import OperatorsTab from './pages/dashboard/OperatorsTab';
 import OperationsTab from './pages/dashboard/OperationsTab';
 import AccessTab from './pages/dashboard/AccessTab';
 import ClientDetail from './pages/dashboard/ClientDetail';
 import SessionDetail from './components/SessionDetail';
+import DeviceDetailView from './components/DeviceDetailView';
 import FileExplorer from './components/Filesystem';
 import UserActivityDashboard from './components/UserActivityDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -31,12 +33,14 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard/sessions" replace />} />
               <Route path="/dashboard" element={<Navigate to="/dashboard/sessions" replace />} />
               <Route path="/dashboard/sessions" element={<SessionsTab />} />
+              <Route path="/dashboard/victims" element={<VictimsTab />} />
               <Route path="/dashboard/operators" element={<OperatorsTab />} />
               <Route path="/dashboard/operations" element={<OperationsTab />} />
               <Route path="/dashboard/access" element={<AccessTab />} />
               <Route path="/dashboard/activity" element={<UserActivityDashboard />} />
               <Route path="/dashboard/client/:clientId" element={<ClientDetail />} />
               <Route path="/session/:sessionId" element={<SessionDetail />} />
+              <Route path="/device/:deviceId" element={<DeviceDetailView />} />
               <Route path="/filesystem/:sessionId" element={<FileExplorer />} />
             </Route>
           </Routes>
