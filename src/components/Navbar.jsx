@@ -205,15 +205,48 @@ const Navbar = ({ backend_url }) => {
         throw new Error(`Missing required configuration fields: ${missingFields.join(', ')}`);
       }
 
+      // Additional validation for lhost and lport
+      if (configToUse.lhost === 'localhost') {
+        configToUse.lhost = '127.0.0.1'; // Convert localhost to IP address
+        console.log('Converted localhost to 127.0.0.1');
+      }
+      
+      if (typeof configToUse.lport === 'string') {
+        configToUse.lport = parseInt(configToUse.lport, 10);
+        console.log('Converted lport to number:', configToUse.lport);
+      }
+
       // Connect using the configuration - send the config object directly
+      console.log('Sending connection request with config:', {
+        operator: configToUse.operator,
+        lhost: configToUse.lhost,
+        lport: configToUse.lport,
+        hasToken: !!configToUse.token,
+        hasCACert: !!configToUse.ca_certificate,
+        hasPrivateKey: !!configToUse.private_key,
+        hasCertificate: !!configToUse.certificate
+      });
+      
       const response = await api.post('/connect', configToUse);
       
       if (response.data.status === "connected") {
+        // Save the configuration to database if it's a manual configuration
+        if (selectedOption === 'manual' && connectionConfig && connectionName) {
+          try {
+            await saveConnection(nameToUse, JSON.stringify(configToUse));
+            console.log('Configuration saved successfully');
+          } catch (saveError) {
+            console.error('Failed to save configuration:', saveError);
+            // Don't throw error here as connection was successful
+          }
+        }
+        
         await checkConnection();
         setDropdownOpen(false);
         setConnectionName('');
         setConnectionConfig('');
         setSelectedPastConnection(null);
+        setSelectedOption(null);
       } else {
         throw new Error(response.data.message || 'Failed to connect');
       }
